@@ -1,0 +1,311 @@
+---
+title: "Sams Analysis"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Sams Club Analysis
+
+```{r}
+
+
+library(data.table)
+library(dplyr)
+library(writexl)
+library(lubridate)
+library(stringr)
+library(tidyverse)
+
+getwd()
+setwd("~/OneDrive - USC Marshall School of Business/DSO545_Statistical Computing and Data Visualization/Sam's Club/USC_FY_Renewals")
+member_ori<-fread("members.txt", sep = "|")
+member<-fread("members.txt", sep = "|")
+
+write.csv(member,"member.csv")
+
+```
+the members data include members who join not only in Jan 2017, but also in other months.   
+
+Below from the project despriction: 
+Input Data:
+- One cohort of members (e.g. 
+members who joined in Jan 2017) (TBD)  
+o Indicatorofrenewal
+- Point of Sale (POS) data for those members, from join date to DTR date
+o Item level data for every transaction
+- Member attributes, join and demographic data
+- Item/category cross-reference data  
+
+So 
+```{r}
+member$JOIN_DATE<-ymd(member$JOIN_DATE)
+member = member %>% 
+  filter(JOIN_DATE>="2017-01-01"&JOIN_DATE<="2017-01-31") 
+```
+
+
+
+```{r}
+# delete cohart month since it's all same as 1
+member$COHORT_MONTH = NULL
+# Converting all dates from chr to Date objects
+member$LAST_RENEW_DATE<-ymd(member$LAST_RENEW_DATE)
+member$RENEW_DATE<-ymd(member$RENEW_DATE)
+member$NEXT_RENEW_DATE<-ymd(member$NEXT_RENEW_DATE)
+member$PLUS_UPGRADE_DATE<-ymd(member$PLUS_UPGRADE_DATE)
+
+###change cha to factor for better summary and delete replicate information
+member$MEMBERSHIP_TYPE_DESC =as.factor(member$MEMBERSHIP_TYPE_DESC)
+member$MEMBERSHIP_TYPE_CODE =NULL
+
+unique(member$TENURE_GRP)
+# "1" for all so all the members here are first year
+member$TENURE_GRP = NULL
+
+member$RENEW_IND = as.factor(member$RENEW_IND)
+levels(member$RENEW_IND)
+member$PLUS_STATUS_BEFORE_REN = as.factor(member$PLUS_STATUS_BEFORE_REN)
+levels(member$PLUS_STATUS_BEFORE_REN)
+member$PLUS_STATUS_AFTER_REN=as.factor(member$PLUS_STATUS_AFTER_REN)
+naa = which(member$PLUS_STATUS_AFTER_REN =="?")
+member$PLUS_STATUS_AFTER_REN[naa] =NA
+member$PLUS_STATUS_AFTER_REN=as.factor(as.character(member$PLUS_STATUS_AFTER_REN))
+levels(member$PLUS_STATUS_AFTER_REN)
+
+## clean the demographic information
+member$MILES_TO_CLUB=as.numeric(member$MILES_TO_CLUB)
+member$hhh_age_desc = as.factor(member$hhh_age_desc)
+unique(member$hhh_age_desc)
+
+# use the latter number as the approximate age, 
+member$hhh_age_desc = str_sub(member$hhh_age_desc, -2)
+na = which(member$hhh_age_desc =="?")
+member$hhh_age_desc[na] =NA
+unique(member$hhh_age_desc)
+member$hhh_age_desc =as.numeric(member$hhh_age_desc)
+
+
+member$marital_status_desc = as.factor(member$marital_status_desc)
+unique(member$marital_status_desc)
+member$marital_status_desc[which(member$marital_status_desc=="?")] =NA
+# what's the difference between "? " and "unknown"
+
+member$income_desc = as.factor(member$income_desc)
+unique(member$income_desc)
+member$income_desc[which(member$income_desc=="?")] =NA
+
+member$hh_size_desc = str_sub(member$hh_size_desc, 1,2)
+member$hh_size_desc = as.numeric(member$hh_size_desc)
+
+member$nbr_children_desc= str_sub(member$nbr_children_desc, 1, 2)
+member$nbr_children_desc = as.numeric(member$nbr_children_desc)
+summary(member$nbr_children_desc)
+
+
+member$ethnic_desc = as.factor(member$ethnic_desc)
+levels(member$ethnic_desc)
+member$ethnic_desc[which(member$ethnic_desc=="?")] =NA
+
+
+member$autorenew_ind = as.factor(member$autorenew_ind)
+member$payroll_deduct_ind =as.factor(member$payroll_deduct_ind)
+member$PLUS_MEMBERSHIP_IND= as.factor(member$PLUS_MEMBERSHIP_IND)
+summary(member)
+```
+Questions:
+
+1 What is business type? How could business type customer also have age, marital status, number of children etc...
+??? they are different, should be analysed differently  
+
+2 What is plus-upgrade-date mean?   
+* PLUS_MEMBERSHIP_IND is not consistent with PLUS_STATUS_AFTER_REN or PLUS_STATUS_before_REN, see explanation in dictionary
+
+4 what is payroll-deduct-ind?   
+
+ 
+```{r}
+# for better analysis put into longtable
+
+```
+
+
+There are four possible situation for members' renew behavior:
+BN base->not renew
+BB base-> base
+BP base-> plus 
+PN plus-> not renew
+PB plus-> base
+PP plus-> plus
+```{r}
+member$renew_flag = ifelse(
+ member$PLUS_STATUS_BEFORE_REN=="BASE"&is.na(member$PLUS_STATUS_AFTER_REN),"BN", 
+  ifelse(
+    member$PLUS_STATUS_BEFORE_REN=="BASE"&member$PLUS_STATUS_AFTER_REN =="BASE","BB",
+    ifelse(
+      member$PLUS_STATUS_BEFORE_REN=="BASE"&member$PLUS_STATUS_AFTER_REN =="PLUS","BP",
+      ifelse(
+        member$PLUS_STATUS_BEFORE_REN=="PLUS"&is.na(member$PLUS_STATUS_AFTER_REN),"PN",
+        ifelse(
+          member$PLUS_STATUS_BEFORE_REN=="PLUS"&member$PLUS_STATUS_AFTER_REN =="BASE","PB",
+          ifelse(
+            member$PLUS_STATUS_BEFORE_REN=="PLUS"&member$PLUS_STATUS_AFTER_REN =="PLUS","PP", NA
+          )
+        )
+      )
+    )
+  )
+)
+member$renew_flag =as.factor(member$renew_flag)
+t = data.frame(table(member$renew_flag))
+ggplot(member, aes(RENEW_IND, fill = autorenew_ind))+
+  geom_bar()
+```
+
+```{r}
+library(plotly)
+plot_ly(
+  type = "sankey",
+  orientation = "h",
+  
+  node = list(
+    label = c("Base", "Plus", "Base", "Plus", "Not Renewal"),
+    color = c("blue", "red", "blue", "red", "black"),
+    pad = 15,
+    thickness = 20,
+    line = list(
+      color = "black",
+      width = 0.5
+    )
+  ),
+  
+  link = list(
+    source = c(0,0,0,1,1,1),
+    target = c(2,4,3,2,4,3),
+    value =  t[,2]
+  )
+) %>% 
+  layout(
+    title = "Customer Renewal Flow",
+    font = list(
+      size = 10
+    )
+  )
+
+
+```
+
+## There are two types of membership
+```{r}
+member %>% 
+  group_by(MEMBERSHIP_TYPE_DESC) %>% 
+  summarise(n())
+```
+Analyze separatetly!!!!!!!  
+Savings    -----       business
+
+
+Members who signed up for autorenew may also attrite. May worth investigate about their puchasing behavior.
+
+```{r}
+
+```
+
+##Explore the demographic data for members who enter the info in the system   
+Caution: Beware of bias who got to enter those additional information and those who dont. for example, can they represent the whole population?  
+
+
+```{r}
+member$nbr_children = ifelse(
+  member$nbr_children_desc==0, "0", ifelse(
+    member$nbr_children_desc>0&member$nbr_children_desc<=3, "1-3","4+"
+  )
+)
+member %>% 
+  ggplot(aes(x=nbr_children, fill=renew_ind1))+
+  geom_bar(position = "dodge")+
+  facet_wrap(`)
+```
+member$nbr_children_desc = as.factor(member$nbr_children_desc)
+
+member %>% 
+  ggplot(aes(x=nbr_children_desc, y = marital_status_desc))+
+  geom_tile()+
+  scale_fill_gradient()
+
+```{r}
+member = member %>% 
+  mutate(renew_ind1 = ifelse(RENEW_IND == 'UNRENEWED', "No", "Yes"))
+
+member %>% 
+  filter(!is.na(hhh_age_desc)) %>% 
+  ggplot(aes(x=hhh_age_desc, fill = renew_ind1))+
+  geom_density(alpha = 0.3)
+```
+
+
+For Plus members, age does not make a distinct difference between people who renewd and who dont. For Basic members, age does--older people in their 50's tend to renew more than younger people in their 30's.  
+Why there is a dip for people in their 40's?
+
+
+```{r}
+member %>% 
+  filter(!is.na(MILES_TO_CLUB)) %>% 
+  ggplot(aes(x=MILES_TO_CLUB, color = renew_flag))+
+  geom_density()+
+  facet_wrap(~MEMBERSHIP_TYPE_DESC,2)
+```
+outliers in miles to club
+```{r}
+boxplot(member$MILES_TO_CLUB)
+```
+```{r}
+nrow(member %>% filter(MILES_TO_CLUB ==9999.99))
+# 682
+nrow(member %>% filter(MILES_TO_CLUB >=2000))
+# 682
+
+```
+682 customers registered their miles to club as 9999.99. We assume this variable is generated as the distance from the club location they first opened the account to their registered home. Those could be in different state( people traveling), or foreigners...
+
+```{r}
+## look at miles to club <50
+member %>% 
+  filter(!is.na(MILES_TO_CLUB)& MILES_TO_CLUB<50) %>% 
+  ggplot(aes(x=MILES_TO_CLUB, color = RENEW_IND))+
+  geom_density()+
+  facet_wrap(~MEMBERSHIP_TYPE_DESC,2)+
+  theme_bw()
+```
+Members live nearer tend to renew   
+
+
+```{r}
+member %>% 
+  ggplot(aes(x = marital_status_desc)) +
+  geom_histogram(stat ="count")
+```
+
+
+to be continued...
+
+## investigate the renewal date/upgrade date
+```{r}
+summary(member$PLUS_UPGRADE_DATE)
+```
+a member can choose to upgrade in any day, the latest renewal date record is 2018/9/19, which means s/he is base before, but at 2018/9/19, s/he choose to upgrade.   
+note: PLUS_MEMBERSHIP_IND mean Members "current" plus status -- current means 2018/9, not the end of the 2018 year.   
+Other idicators means status at the end of the year.
+```{r}
+levels(member$RENEW_IND)
+member %>% 
+  filter((RENEW_IND == "RENEWED BASE"|RENEW_IND == "RENEWED PLUS")&
+         (PLUS_UPGRADE_DATE>="2017-01-01"&PLUS_UPGRADE_DATE<="2017-12-31")) %>% 
+  ggplot(aes(x= month(PLUS_UPGRADE_DATE, label = TRUE, abbr = TRUE), fill = RENEW_IND))+
+  geom_bar(position = "dodge")
+```
+=> does it make sense?? 
