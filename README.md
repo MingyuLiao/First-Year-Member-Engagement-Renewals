@@ -2,7 +2,7 @@
 
 DSO 545 Final Project - Fall 2018
 
-Group members: Mingyu Liao, Sukanya Parsekar, Avinash M, Hongxuan Wang, Hadeer Tawfick
+Group members: Mingyu Liao, Sukanya Parsekar, Avinash M, Hongxuan Wang, Hadeer Tawfick (Special shout to Sukanya, Avinash & Hongxuan, the EDA codes and Shiny codes are mostly contributed by them)
 
 MS Busienss Analytics, Marshall School of Business
 
